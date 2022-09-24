@@ -159,6 +159,21 @@ void draw_field(const float *F, Uint32 *cpu_pix1, Uint32 *cpu_pix2, const unsign
 
 int main(int argc, char** argv)
 {
+    // -- TEST OMP -- //
+    int n_threads;
+    int tid;
+    #pragma omp parallel private(n_threads, tid)
+    {
+        tid = omp_get_thread_num();
+        printf("hello from thread %i\n", tid);
+        if (tid == 0)
+        {
+            n_threads = omp_get_num_threads();
+            printf("total of %i threads\n", n_threads);
+        }
+        
+    }
+
     // --SET UP SDL -- //
     SDL_Init(SDL_INIT_VIDEO);
 
