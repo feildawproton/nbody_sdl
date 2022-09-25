@@ -1,5 +1,5 @@
 
-#include "SDL2/SDL.h"
+#include <SDL2/SDL.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -53,7 +53,6 @@ void destroy_particles(Particle *P)
 
 void attract_vel(Particle *P, const float dt, const unsigned N)
 {
-    //unsigned i = 0;
     #pragma omp parallel for
     for (unsigned i = 0; i < N; i++)
     {
@@ -127,12 +126,11 @@ void integrate(Particle *P, const float dt, const unsigned N)
 }
 
 //set field doesn't check bounds
-void set_fields(const Particle *P, const unsigned N, float *F_1, float *F_2, const unsigned WIDTH, const unsigned HEIGHT)
+void set_field(const Particle *P, const unsigned N, float *F, const unsigned WIDTH, const unsigned HEIGHT)
 {
-    memset(F_1, 0.0, WIDTH * HEIGHT * sizeof(float));
-    //don't reset F_2
-    //care should be when parallelizing this to avoid race conditions
-    //this is like reduce-sum but with a field instead of a single variable
+    memset(F, 0.0, WIDTH * HEIGHT * sizeof(float));
+
+    // -- LOOK OUT FOR RACE CONDITION -- //
     for (unsigned i = 0; i < N; i++)
     {
         unsigned x = (unsigned)(P[i].x * WIDTH);
@@ -141,25 +139,21 @@ void set_fields(const Particle *P, const unsigned N, float *F_1, float *F_2, con
         {
             if (y >= 0 && y < HEIGHT)
             {
-                F_1[y * WIDTH + x] += 1.0;
-                F_2[y * WIDTH + x] += 1.0;
+                F[y * WIDTH + x] += 1.0;
             }
             
         }       
     }
 }
 
-void draw_fields(const float *F_1, const float *F_2, Uint32 *cpu_pix1, Uint32 *cpu_pix2, const unsigned WIDTH, const unsigned HEIGHT)
+void draw_field(const float *F, Uint32 *cpu_pix1, Uint32 *cpu_pix2, const unsigned WIDTH, const unsigned HEIGHT)
 {
     #pragma omp parallel for
     for (unsigned i = 0; i < WIDTH * HEIGHT; i++)
     {
-        cpu_pix1[i]     = (Uint32) (F_1[i] * 256 * 255); 
-
-        Uint32 red      = (Uint32) (F_2[i]);
-        Uint32 green    = (Uint32) (F_2[i] / 256);
-        Uint32 blue     = (Uint32) (F_2[i] / (256 * 256));
-        cpu_pix2[i]     = red + green + blue; 
+        float fval = F[i];
+        cpu_pix1[i] = (Uint32) (fval * 256 * 255); //need to do bet
+        cpu_pix2[i] += (Uint32) (fval * 256 * 256); //need to do better
         //cpu_pixels[i] = 0xFF010101;
     }
 }
@@ -180,26 +174,22 @@ int main(int argc, char** argv)
         }
         
     }
+
     // --SET UP SDL -- //
     SDL_Init(SDL_INIT_VIDEO);
 
     SDL_Window *window          = SDL_CreateWindow("base nbody", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WIDTH * 2, HEIGHT, 0);   //the window
     SDL_Renderer *renderer      = SDL_CreateRenderer(window, -1, 0);    //pick the driver, -1 means init the first one supported with the flags 0
-    SDL_Texture *gpu_tex1       = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, WIDTH, HEIGHT);
-    SDL_Texture *gpu_tex2       = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, WIDTH, HEIGHT);
+    SDL_Texture *gpu_tex1       = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, WIDTH, HEIGHT);
+    SDL_Texture *gpu_tex2       = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, WIDTH, HEIGHT);
     Uint32 *cpu_pix1            = (Uint32 *)malloc(WIDTH * HEIGHT * sizeof(Uint32));
     memset(cpu_pix1, 0, WIDTH * HEIGHT * sizeof(Uint32)); //make it black
     Uint32 *cpu_pix2            = (Uint32 *)malloc(WIDTH * HEIGHT * sizeof(Uint32));
     memset(cpu_pix2, 0, WIDTH * HEIGHT * sizeof(Uint32)); //make it black
 
     // --SET UP SIM -- //
-    float *F_1                  = (float *)malloc(WIDTH * HEIGHT * sizeof(float));
-    memset(F_1, 0.0, WIDTH * HEIGHT * sizeof(float));
-    float *F_2                  = (float *)malloc(WIDTH * HEIGHT * sizeof(float));
-    memset(F_2, 0.0, WIDTH * HEIGHT * sizeof(float));
-    
-    SDL_PixelFormat *fmt;                    
-    fmt->format = SDL_PIXELFORMAT_ABGR8888;
+    float *F                    = (float *)malloc(WIDTH * HEIGHT * sizeof(float));
+    memset(F, 0.0, WIDTH * HEIGHT * sizeof(float));
 
     Particle *P                 = create_particles();
 
@@ -224,8 +214,8 @@ int main(int argc, char** argv)
         struct timespec cpudraw_start;
         clock_gettime(CLOCK_MONOTONIC, &cpudraw_start); 
 
-            set_fields(P, N, F_1, F_2, WIDTH, HEIGHT);
-            draw_fields(F_1, F_2, cpu_pix1, cpu_pix2, WIDTH, HEIGHT);
+            set_field(P, N, F, WIDTH, HEIGHT);
+            draw_field(F, cpu_pix1, cpu_pix2, WIDTH, HEIGHT);
 
         struct timespec cpudraw_stop;
         clock_gettime(CLOCK_MONOTONIC, &cpudraw_stop);
@@ -253,8 +243,7 @@ int main(int argc, char** argv)
     printf("Total time in sdl draw: %f for %u iterations\n", sdldraw_time, iter);
 
     destroy_particles(P);
-    free(F_2);
-    free(F_1);
+    free(F);
     free(cpu_pix2);
     free(cpu_pix1);
     SDL_DestroyTexture(gpu_tex2);
