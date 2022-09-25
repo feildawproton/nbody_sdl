@@ -5,7 +5,7 @@ basecase: src/basecase.c
 	#gprof bin/basecase gmon.out > prof/prof_basecase
 
 basecase_omp: src/basecase_omp.c
-	gcc src/basecase_omp.c -lSDL2 -lSDL2main -fopenmp -o bin/basecase_omp
+	gcc src/basecase_omp.c -lSDL2 -lSDL2main -fopenmp -O2 -o bin/basecase_omp
 	./bin/basecase_omp
 
 
