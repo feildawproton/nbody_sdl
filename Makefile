@@ -16,12 +16,8 @@ field_omp: src/field_omp.c
 	gcc src/field_omp.c -lSDL2 -lSDL2main -fopenmp -O2 -o bin/field_omp
 	./bin/field_omp
 
-pull_omp: src/pull_omp.c
-	gcc src/pull_omp.c -lSDL2 -lSDL2main -fopenmp -O2 -o bin/pull_omp
-	./bin/pull_omp
-
-pull2: src/pull2.c
-	gcc src/pull2.c -lSDL2 -lSDL2main -fopenmp -O2 -o bin/pull2
-	./bin/pull2
+field_omp2: src/field_omp2.c
+	gcc src/field_omp2.c -lSDL2 -lSDL2main -fopenmp -O2 -o bin/field_omp2
+	./bin/field_omp2
 
 
