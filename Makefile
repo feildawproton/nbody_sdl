@@ -20,3 +20,8 @@ pull_omp: src/pull_omp.c
 	gcc src/pull_omp.c -lSDL2 -lSDL2main -fopenmp -O2 -o bin/pull_omp
 	./bin/pull_omp
 
+pull2: src/pull2.c
+	gcc src/pull2.c -lSDL2 -lSDL2main -fopenmp -O2 -o bin/pull2
+	./bin/pull2
+
+
