@@ -9,6 +9,6 @@ basecase_omp: src/basecase_omp.c
 	./bin/basecase_omp
 
 field: src/field.c
-	gcc src/field.c -lSDL2 -lSDL2main -O2 -o bin/field
+	gcc src/field.c -lSDL2 -lSDL2main -o bin/field
 	./bin/field
 
