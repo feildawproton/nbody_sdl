@@ -8,4 +8,7 @@ basecase_omp: src/basecase_omp.c
 	gcc src/basecase_omp.c -lSDL2 -lSDL2main -fopenmp -O2 -o bin/basecase_omp
 	./bin/basecase_omp
 
+field: src/field.c
+	gcc src/field.c -lSDL2 -lSDL2main -O2 -o bin/field
+	./bin/field
 
