@@ -10,8 +10,8 @@
 const unsigned WIDTH    = 512;
 const unsigned HEIGHT   = 512;
 
-const unsigned N        = 3;
-const unsigned ITER     = 10000;
+const unsigned N        = 2;
+const unsigned ITER     = 5000;
 
 const float dt          = 0.075f;
 
@@ -208,7 +208,11 @@ double draw_surface(const float *field, Uint32 *pixels, const unsigned LENGTH)
     #pragma omp parallel for
     for (unsigned i = 0; i < LENGTH; i++)
     {
-        pixels[i] = (field[i] * 255 * 256 * 256);
+        Uint32 alpha    = 0xFF000000;
+        Uint32 blue     = (Uint32)(field[i] * 255 * 256 * 256);
+        Uint32 green    = (Uint32)(field[i] * 255 * 256);
+        Uint32 red      = (Uint32)(field[i] * 255);
+        pixels[i] = alpha + blue + green + red;
     }
     
     struct timespec wall_stop;
