@@ -56,7 +56,7 @@ double set_field(const Particle *P, const unsigned N, float *F, const unsigned W
     //memset(F, 0.0, WIDTH * HEIGHT * sizeof(float));
 
     //firsty clear the locations where the particles will be.
-    //this is clearly not right
+    //this is not right
     #pragma omp parallel for
     for (unsigned i = 0; i < N; i++)
     {
@@ -155,7 +155,7 @@ double update_field(const float *source, float *target, const unsigned WIDTH, co
             //float ru = sample_zeropad(source, x + 1, y - 1, WIDTH, HEIGHT);
 
             float l  = sample_zeropad(source, x - 1, y    , WIDTH, HEIGHT);
-            float c  = sample_zeropad(source, x    , y    , WIDTH, HEIGHT);
+            //float c  = sample_zeropad(source, x    , y    , WIDTH, HEIGHT);
             float r  = sample_zeropad(source, x + 1, y    , WIDTH, HEIGHT);
 
             //float ld = sample_zeropad(source, x - 1, y + 1, WIDTH, HEIGHT);
@@ -163,11 +163,11 @@ double update_field(const float *source, float *target, const unsigned WIDTH, co
             //float rd = sample_zeropad(source, x + 1, y + 1, WIDTH, HEIGHT);
 
             //float sum = lu + up + ru + l + c + r + ld + dn + rd;
-            float sum = up + l + c + r + dn;
+            float sum = up + l + r + dn;
 
             //float val = sum / 9.0f;
 
-            float val = sum / 5.0f;
+            float val = sum / 4.0f;
 
             target[y*WIDTH + x] = val;
         }
@@ -237,7 +237,7 @@ int main(int argc, char** argv)
     // --SET UP SDL -- //
     SDL_Init(SDL_INIT_VIDEO);
 
-    SDL_Window *window          = SDL_CreateWindow("field", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WIDTH, HEIGHT, 0);
+    SDL_Window *window          = SDL_CreateWindow("field", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WIDTH * 2, HEIGHT * 2, 0);
     SDL_Renderer *renderer      = SDL_CreateRenderer(window, -1, 0);    //pick the driver, -1 means init the first one supported with the flags 0
     SDL_Texture *gpu_tex        = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, WIDTH, HEIGHT);
     SDL_Surface *surface        = SDL_CreateRGBSurface(0, WIDTH, HEIGHT, 32, 0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000);

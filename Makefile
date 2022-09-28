@@ -20,4 +20,8 @@ field_omp2: src/field_omp2.c
 	gcc src/field_omp2.c -lSDL2 -lSDL2main -fopenmp -O2 -o bin/field_omp2
 	./bin/field_omp2
 
+move_omp: src/move_omp.c
+	gcc src/move_omp.c -lSDL2 -lSDL2main -fopenmp -O2 -o bin/move_omp
+	./bin/move_omp
+
 

@@ -10,22 +10,91 @@
 const unsigned WIDTH    = 512;
 const unsigned HEIGHT   = 512;
 
-const unsigned N        = 1000;
-const unsigned iter     = 10000;
+const unsigned N        = 3;
+const unsigned ITER     = 10000;
 
-void init_field(float *field)
+const float dt          = 0.075f;
+
+struct Particle{
+    float x;
+    float dx;
+    float y;
+    float dy;
+};
+typedef struct Particle Particle;
+
+Particle *create_particles()
 {
     //init RNG
     time_t t;
     srand((unsigned) time(&t));
-    
+
+    Particle *P = (Particle *)malloc(N * sizeof(Particle));
+    for(unsigned i = 0; i < N; i++)
+    {
+        P[i].x  = ((float) rand()) / ((float) RAND_MAX);
+        P[i].y  = ((float) rand()) / ((float) RAND_MAX);
+        //put them more centered
+        //P[i].x  = (P[i].x / 4) + (3.0f / 8.0f);
+        //P[i].y  = (P[i].y / 4) + (3.0f / 8.0f);
+        P[i].x  = (P[i].x / 2) + (1.0f / 4.0f);
+        P[i].y  = (P[i].y / 2) + (1.0f / 4.0f);
+        P[i].dx = 0.0;
+        P[i].dy = 0.0;
+    }
+    return P;
+}
+void destroy_particles(Particle *P)
+{
+    free(P);
+}
+
+//set field doesn't check bounds
+double set_field(const Particle *P, const unsigned N, float *F, const unsigned WIDTH, const unsigned HEIGHT)
+{
+    struct timespec wall_start;              
+    clock_gettime(CLOCK_MONOTONIC, &wall_start);     //CLOCK_MONOTONIC requires POSIX
+
+    //memset(F, 0.0, WIDTH * HEIGHT * sizeof(float));
+
+    //firsty clear the locations where the particles will be.
+    //this is not right
+    #pragma omp parallel for
     for (unsigned i = 0; i < N; i++)
     {
-        float f = ((float) rand()) / ((float) RAND_MAX);
-        unsigned p = (unsigned) (f * WIDTH * HEIGHT);
-        //printf("f: %f and p: %i at iteration %i\n", f, p, i);
-        field[p] = -1.0f;
+        unsigned x = (unsigned)(P[i].x * WIDTH);
+        unsigned y = (unsigned)(P[i].y * HEIGHT);
+        if (x >= 0 && x < WIDTH)
+        {
+            if (y >= 0 && y < HEIGHT)
+            {
+                F[y * WIDTH + x] = 0.0;
+            }
+            
+        }       
     }
+
+    // -- LOOK OUT FOR RACE CONDITION -- //
+    //need to reduce sum
+    for (unsigned i = 0; i < N; i++)
+    {
+        unsigned x = (unsigned)(P[i].x * WIDTH);
+        unsigned y = (unsigned)(P[i].y * HEIGHT);
+        if (x >= 0 && x < WIDTH)
+        {
+            if (y >= 0 && y < HEIGHT)
+            {
+                F[y * WIDTH + x] += 1.0;
+            }
+            
+        }       
+    }
+
+    struct timespec wall_stop;
+    clock_gettime(CLOCK_MONOTONIC, &wall_stop);      //requires POSIX
+    double wall_time    = (wall_stop.tv_sec - wall_start.tv_sec);
+    wall_time           += (wall_stop.tv_nsec - wall_start.tv_nsec) / 1000000000.0;
+    return wall_time;
 }
 
 float sample_hardboundary(const float *source, const int x, const int y, const unsigned WIDTH, const unsigned HEIGHT)
@@ -47,8 +116,6 @@ float sample_hardboundary(const float *source, const int x, const int y, const u
 
     return val;
 }
-
-
 float sample_zeropad(const float *source, const int x, const int y, const unsigned WIDTH, const unsigned HEIGHT)
 {
     float val = 0.0f;
@@ -89,7 +156,7 @@ double update_field(const float *source, float *target, const unsigned WIDTH, co
             //float ru = sample_zeropad(source, x + 1, y - 1, WIDTH, HEIGHT);
 
             float l  = sample_zeropad(source, x - 1, y    , WIDTH, HEIGHT);
-            float c  = sample_zeropad(source, x    , y    , WIDTH, HEIGHT);
+            //float c  = sample_zeropad(source, x    , y    , WIDTH, HEIGHT);
             float r  = sample_zeropad(source, x + 1, y    , WIDTH, HEIGHT);
 
             //float ld = sample_zeropad(source, x - 1, y + 1, WIDTH, HEIGHT);
@@ -97,10 +164,11 @@ double update_field(const float *source, float *target, const unsigned WIDTH, co
             //float rd = sample_zeropad(source, x + 1, y + 1, WIDTH, HEIGHT);
 
             //float sum = lu + up + ru + l + c + r + ld + dn + rd;
-            float sum = up + l + c + r + dn;
+            float sum = up + l + r + dn;
 
-            //float val = sum / 9.0f
-            float val = sum / 5.0f;
+            //float val = sum / 9.0f;
+
+            float val = sum / 4.0f;
 
             target[y*WIDTH + x] = val;
         }
@@ -108,7 +176,6 @@ double update_field(const float *source, float *target, const unsigned WIDTH, co
 
     struct timespec wall_stop;
     clock_gettime(CLOCK_MONOTONIC, &wall_stop);      //requires POSIX
-
     double wall_time    = (wall_stop.tv_sec - wall_start.tv_sec);
     wall_time           += (wall_stop.tv_nsec - wall_start.tv_nsec) / 1000000000.0;
     return wall_time;
@@ -141,15 +208,64 @@ double draw_surface(const float *field, Uint32 *pixels, const unsigned LENGTH)
     #pragma omp parallel for
     for (unsigned i = 0; i < LENGTH; i++)
     {
-        pixels[i] = (field[i] * -1.0 * 255 * 256 * 256);
+        pixels[i] = (field[i] * 255 * 256 * 256);
     }
     
     struct timespec wall_stop;
     clock_gettime(CLOCK_MONOTONIC, &wall_stop);      //requires POSIX
-
     double wall_time    = (wall_stop.tv_sec - wall_start.tv_sec);
     wall_time           += (wall_stop.tv_nsec - wall_start.tv_nsec) / 1000000000.0;
     return wall_time;
+}
+
+double update_particles(const float *field, const unsigned WIDTH, const unsigned HEIGHT, Particle *P, const unsigned N)
+{
+    struct timespec wall_start;              
+    clock_gettime(CLOCK_MONOTONIC, &wall_start);     //CLOCK_MONOTONIC requires POSIX
+
+    #pragma omp parallel for
+    for (unsigned i = 0; i < N; i++)
+    {
+        unsigned x = (unsigned)(P[i].x * WIDTH);
+        unsigned y = (unsigned)(P[i].y * HEIGHT);
+        
+        float up = sample_zeropad(field, x    , y - 1, WIDTH, HEIGHT);
+        float l  = sample_zeropad(field, x - 1, y    , WIDTH, HEIGHT);
+        float c  = sample_zeropad(field, x    , y    , WIDTH, HEIGHT);
+        float r  = sample_zeropad(field, x + 1, y    , WIDTH, HEIGHT);
+        float dn = sample_zeropad(field, x    , y + 1, WIDTH, HEIGHT);
+
+        float left_cost     = l - c;
+        float right_cost    = r - c;
+        float up_cost       = up - c;
+        float down_cost     = dn - c;
+
+        //not exactly how I want to do it I thin
+        float x_force = right_cost - left_cost;
+        float y_force = down_cost - up_cost;
+
+        P[i].dx    += x_force;// * dt;    //update velocity
+        P[i].dy    += y_force;// * dt;
+        P[i].x     += P[i].dx * dt;    //update position
+        P[i].y     += P[i].dy * dt;
+
+        unsigned newx = (unsigned)(P[i].x * WIDTH);
+        unsigned newy = (unsigned)(P[i].y * HEIGHT);
+        
+        if (i == 0)
+        {
+            if (x != newx || y != newy)
+            {
+                printf("old x,y: (%i, %i) and new x,y: (%i, %i)\n", x, y, newx, newy);
+            }
+        }
+    }
+
+    struct timespec wall_stop;
+    clock_gettime(CLOCK_MONOTONIC, &wall_stop);      //requires POSIX
+    double wall_time    = (wall_stop.tv_sec - wall_start.tv_sec);
+    wall_time           += (wall_stop.tv_nsec - wall_start.tv_nsec) / 1000000000.0;
+    return wall_time;   
 }
 
 int main(int argc, char** argv)
@@ -171,7 +287,7 @@ int main(int argc, char** argv)
     // --SET UP SDL -- //
     SDL_Init(SDL_INIT_VIDEO);
 
-    SDL_Window *window          = SDL_CreateWindow("field", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WIDTH, HEIGHT, 0);
+    SDL_Window *window          = SDL_CreateWindow("field", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WIDTH * 2, HEIGHT * 2, 0);
     SDL_Renderer *renderer      = SDL_CreateRenderer(window, -1, 0);    //pick the driver, -1 means init the first one supported with the flags 0
     SDL_Texture *gpu_tex        = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, WIDTH, HEIGHT);
     SDL_Surface *surface        = SDL_CreateRGBSurface(0, WIDTH, HEIGHT, 32, 0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000);
@@ -182,29 +298,37 @@ int main(int argc, char** argv)
     float *field2               =(float *)malloc(WIDTH * HEIGHT * sizeof(float));
     memset(field2, 0.0f, WIDTH * HEIGHT * sizeof(float));
 
-    init_field(field1);
+    Particle *particles = create_particles();
 
+    double particle_time    = 0.0f;
+    double setfield_time    = 0.0f;
     double update_time      = 0.0f;
     double cpudraw_time     = 0.0f;
     double fieldcopy_time   = 0.0f;
-    for (unsigned i = 0; i < iter; i++)
+    for (unsigned i = 0; i < ITER; i++)
     {
-        update_time += update_field(field1, field2, WIDTH, HEIGHT);
+        setfield_time   += set_field(particles, N, field1, WIDTH, HEIGHT); 
+        
+        update_time     += update_field(field1, field2, WIDTH, HEIGHT);
 
-        cpudraw_time += draw_surface(field2, surface->pixels, WIDTH*HEIGHT);
+        cpudraw_time    += draw_surface(field2, surface->pixels, WIDTH*HEIGHT);
 
         SDL_UpdateTexture(gpu_tex, NULL, surface->pixels, WIDTH * sizeof(Uint32));
         SDL_RenderClear(renderer);
         SDL_RenderCopy(renderer, gpu_tex, NULL, NULL);
         SDL_RenderPresent(renderer);
 
-        fieldcopy_time += copy_field(field2, field1, WIDTH * HEIGHT);
-    }
+        fieldcopy_time  += copy_field(field2, field1, WIDTH * HEIGHT);
 
+        particle_time   += update_particles(field1, WIDTH, HEIGHT, particles, N);
+    }
+    printf("Time spent updating particles: %f for %i iterations\n", particle_time, ITER);
+    printf("Time spent setting field: %f for %i iterations\n", update_time, ITER);
     printf("Time spent on updating the field: %f\n", update_time);
     printf("Time spent on cpu draw: %f\n", cpudraw_time);
     printf("Time spent on field copy: %f\n", fieldcopy_time);
     
+    destroy_particles(particles);
     free(field2);
     free(field1);
     SDL_FreeSurface(surface);
