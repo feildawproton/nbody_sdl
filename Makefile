@@ -24,4 +24,8 @@ move_omp: src/move_omp.c
 	gcc src/move_omp.c -lSDL2 -lSDL2main -fopenmp -O2 -o bin/move_omp
 	./bin/move_omp
 
+multiparticle: src/multiparticle.c
+	gcc src/multiparticle.c -lSDL2 -lSDL2main -fopenmp -lm -O2 -o bin/multiparticle
+	./bin/multiparticle
+
 

@@ -11,38 +11,76 @@
 const unsigned WIDTH = 500;
 const unsigned HEIGHT = 500;
 
-const unsigned N = 34;
+const unsigned N_red = 3;
+const unsigned N_green = 3;
+const unsigned N_blue = 3;
+
 const float dt  = 0.0001f;
 
 const unsigned iter = 10000;
 
+/*
 const SDL_Rect dstrect1 = {0, 0, WIDTH * 2, HEIGHT * 2};
 const SDL_Rect dstrect2 = {WIDTH * 2, 0, WIDTH * 2, HEIGHT * 2};
+*/
+
+enum Type{red, green, blue};
+typedef enum Type Type;
+
 
 struct Particle{
-    float x;
-    float dx;
-    float y;
-    float dy;
+    float   x;
+    float   dx;
+    float   y;
+    float   dy;
+    Type    PType;
 };
 typedef struct Particle Particle;
 
-Particle *create_particles()
+Particle *create_particles(const unsigned N_red, const unsigned N_green, const unsigned N_blue)
 {
     //init RNG
     time_t t;
     srand((unsigned) time(&t));
 
+    unsigned N = N_red + N_green + N_blue;
     Particle *P = (Particle *)malloc(N * sizeof(Particle));
-    for(unsigned i = 0; i < N; i++)
+
+    for(unsigned i = 0; i < N_red; i++)
     {
-        P[i].x  = ((float) rand()) / ((float) RAND_MAX);
-        P[i].y  = ((float) rand()) / ((float) RAND_MAX);
+        P[i].x      = ((float) rand()) / ((float) RAND_MAX);
+        P[i].y      = ((float) rand()) / ((float) RAND_MAX);
         //put them more centered
-        P[i].x  = (P[i].x / 4) + (3.0f / 8.0f);
-        P[i].y  = (P[i].y / 4) + (3.0f / 8.0f);
-        P[i].dx = 0.0;
-        P[i].dy = 0.0;
+        P[i].x      = (P[i].x / 4) + (3.0f / 8.0f);
+        P[i].y      = (P[i].y / 4) + (3.0f / 8.0f);
+        P[i].dx     = 0.0;
+        P[i].dy     = 0.0;
+
+        P[i].PType  = red;
+    }
+    for(unsigned i = N_red; i < N_red + N_green; i++)
+    {
+        P[i].x      = ((float) rand()) / ((float) RAND_MAX);
+        P[i].y      = ((float) rand()) / ((float) RAND_MAX);
+        //put them more centered
+        P[i].x      = (P[i].x / 4) + (3.0f / 8.0f);
+        P[i].y      = (P[i].y / 4) + (3.0f / 8.0f);
+        P[i].dx     = 0.0;
+        P[i].dy     = 0.0;
+
+        P[i].PType  = green;
+    }
+    for(unsigned i = N_red + N_green; i < N; i++)
+    {
+        P[i].x      = ((float) rand()) / ((float) RAND_MAX);
+        P[i].y      = ((float) rand()) / ((float) RAND_MAX);
+        //put them more centered
+        P[i].x      = (P[i].x / 4) + (3.0f / 8.0f);
+        P[i].y      = (P[i].y / 4) + (3.0f / 8.0f);
+        P[i].dx     = 0.0;
+        P[i].dy     = 0.0;
+
+        P[i].PType  = blue;
     }
     return P;
 }
@@ -51,8 +89,11 @@ void destroy_particles(Particle *P)
     free(P);
 }
 
-void attract_vel(Particle *P, const float dt, const unsigned N)
+double attract_vel(Particle *P, const float dt, const unsigned N)
 {
+    struct timespec wall_start;              
+    clock_gettime(CLOCK_MONOTONIC, &wall_start);     //CLOCK_MONOTONIC requires POSIX
+
     #pragma omp parallel for
     for (unsigned i = 0; i < N; i++)
     {
@@ -91,43 +132,41 @@ void attract_vel(Particle *P, const float dt, const unsigned N)
         P[i].dx += x_force * dt;
         P[i].dy += y_force * dt;
     }
+
+    struct timespec wall_stop;
+    clock_gettime(CLOCK_MONOTONIC, &wall_stop);      //requires POSIX
+    double wall_time    = (wall_stop.tv_sec - wall_start.tv_sec);
+    wall_time           += (wall_stop.tv_nsec - wall_start.tv_nsec) / 1000000000.0;
+    return wall_time;
 }
 
 //should check bounds here
 //this enforces a taurus geometry (it's also square)
-void integrate(Particle *P, const float dt, const unsigned N)
+double integrate(Particle *P, const float dt, const unsigned N)
 {
+    struct timespec wall_start;              
+    clock_gettime(CLOCK_MONOTONIC, &wall_start);     //CLOCK_MONOTONIC requires POSIX
+
     #pragma omp parallel for
     for (unsigned i = 0; i < N; i++)
     {
         P[i].x += P[i].dx * dt;
         P[i].y += P[i].dy * dt;
-
-        //need to do loops in case it's way out there
-        /*
-        while (P[i].x > 1.0f)
-        {
-            P[i].x = P[i].x - 1.0f;
-        }
-        while (P[i].x < 0.0f)
-        {
-            P[i].x = P[i].x + 1.0f;
-        }
-        while (P[i].y > 1.0f)
-        {
-            P[i].y = P[i].y - 1.0f;
-        }
-        while (P[i].y < 0.0f)
-        {
-            P[i].y = P[i].y + 1.0f;
-        }
-        */
     }
+
+    struct timespec wall_stop;
+    clock_gettime(CLOCK_MONOTONIC, &wall_stop);      //requires POSIX
+    double wall_time    = (wall_stop.tv_sec - wall_start.tv_sec);
+    wall_time           += (wall_stop.tv_nsec - wall_start.tv_nsec) / 1000000000.0;
+    return wall_time;
 }
 
 //set field doesn't check bounds
-void set_field(const Particle *P, const unsigned N, float *F, const unsigned WIDTH, const unsigned HEIGHT)
+double set_field(const Particle *P, const unsigned N, float *F, const unsigned WIDTH, const unsigned HEIGHT)
 {
+    struct timespec wall_start;              
+    clock_gettime(CLOCK_MONOTONIC, &wall_start);     //CLOCK_MONOTONIC requires POSIX
+
     memset(F, 0.0, WIDTH * HEIGHT * sizeof(float));
 
     // -- LOOK OUT FOR RACE CONDITION -- //
@@ -144,18 +183,31 @@ void set_field(const Particle *P, const unsigned N, float *F, const unsigned WID
             
         }       
     }
+
+    struct timespec wall_stop;
+    clock_gettime(CLOCK_MONOTONIC, &wall_stop);      //requires POSIX
+    double wall_time    = (wall_stop.tv_sec - wall_start.tv_sec);
+    wall_time           += (wall_stop.tv_nsec - wall_start.tv_nsec) / 1000000000.0;
+    return wall_time;
 }
 
-void draw_field(const float *F, Uint32 *cpu_pix1, Uint32 *cpu_pix2, const unsigned WIDTH, const unsigned HEIGHT)
+double draw_field(const float *F, Uint32 *cpu_pix1, const unsigned WIDTH, const unsigned HEIGHT)
 {
+    struct timespec wall_start;              
+    clock_gettime(CLOCK_MONOTONIC, &wall_start);     //CLOCK_MONOTONIC requires POSIX
+
     #pragma omp parallel for
     for (unsigned i = 0; i < WIDTH * HEIGHT; i++)
     {
         float fval = F[i];
         cpu_pix1[i] = (Uint32) (fval * 256 * 255); //need to do bet
-        cpu_pix2[i] += (Uint32) (fval * 256 * 256); //need to do better
-        //cpu_pixels[i] = 0xFF010101;
     }
+
+    struct timespec wall_stop;
+    clock_gettime(CLOCK_MONOTONIC, &wall_stop);      //requires POSIX
+    double wall_time    = (wall_stop.tv_sec - wall_start.tv_sec);
+    wall_time           += (wall_stop.tv_nsec - wall_start.tv_nsec) / 1000000000.0;
+    return wall_time;
 }
 
 int main(int argc, char** argv)
@@ -163,35 +215,45 @@ int main(int argc, char** argv)
     // -- TEST OMP -- //
     int n_threads;
     int tid;
-    #pragma omp parallel private(n_threads, tid)
+    #pragma omp parallel private(tid) shared(n_threads)
     {
         tid = omp_get_thread_num();
-        printf("hello from thread %i\n", tid);
         if (tid == 0)
         {
             n_threads = omp_get_num_threads();
             printf("total of %i threads\n", n_threads);
         }
-        
+    }
+
+    omp_set_dynamic(0);
+    omp_set_num_threads(n_threads / 2);
+
+    #pragma omp parallel private(tid) shared(n_threads)
+    {
+        tid = omp_get_thread_num();
+        if (tid == 0)
+        {
+            n_threads = omp_get_num_threads();
+            printf("total of %i threads\n", n_threads);
+        }
     }
 
     // --SET UP SDL -- //
     SDL_Init(SDL_INIT_VIDEO);
 
-    SDL_Window *window          = SDL_CreateWindow("base nbody", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WIDTH * 4, HEIGHT * 2, 0);   //the window
+    SDL_Window *window          = SDL_CreateWindow("base nbody", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WIDTH * 2, HEIGHT * 2, 0);   //the window
     SDL_Renderer *renderer      = SDL_CreateRenderer(window, -1, 0);    //pick the driver, -1 means init the first one supported with the flags 0
     SDL_Texture *gpu_tex1       = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, WIDTH, HEIGHT);
-    SDL_Texture *gpu_tex2       = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, WIDTH, HEIGHT);
     Uint32 *cpu_pix1            = (Uint32 *)malloc(WIDTH * HEIGHT * sizeof(Uint32));
     memset(cpu_pix1, 0, WIDTH * HEIGHT * sizeof(Uint32)); //make it black
-    Uint32 *cpu_pix2            = (Uint32 *)malloc(WIDTH * HEIGHT * sizeof(Uint32));
-    memset(cpu_pix2, 0, WIDTH * HEIGHT * sizeof(Uint32)); //make it black
 
     // --SET UP SIM -- //
     float *F                    = (float *)malloc(WIDTH * HEIGHT * sizeof(float));
     memset(F, 0.0, WIDTH * HEIGHT * sizeof(float));
 
-    Particle *P                 = create_particles();
+    Particle *P                 = create_particles(N_red, N_green, N_blue);
+
+    const unsigned N            = N_red + N_green + N_blue;
 
     double sim_time     = 0;
     double cpudraw_time = 0;
@@ -199,38 +261,20 @@ int main(int argc, char** argv)
     for (unsigned i = 0; i < iter; i++)
     {
         // -- SIM -- //
-        struct timespec sim_start;              
-        clock_gettime(CLOCK_MONOTONIC, &sim_start);     //CLOCK_MONOTONIC requires POSIX
-
-            attract_vel(P, dt, N);
-            integrate(P, dt, N);
-
-        struct timespec sim_stop;
-        clock_gettime(CLOCK_MONOTONIC, &sim_stop);      //requires POSIX
-        sim_time += (sim_stop.tv_sec - sim_start.tv_sec);
-        sim_time += (sim_stop.tv_nsec - sim_start.tv_nsec) / 1000000000.0;
+        sim_time += attract_vel(P, dt, N);
+        sim_time += integrate(P, dt, N);
 
         // -- CPU DRAW -- //
-        struct timespec cpudraw_start;
-        clock_gettime(CLOCK_MONOTONIC, &cpudraw_start); 
-
-            set_field(P, N, F, WIDTH, HEIGHT);
-            draw_field(F, cpu_pix1, cpu_pix2, WIDTH, HEIGHT);
-
-        struct timespec cpudraw_stop;
-        clock_gettime(CLOCK_MONOTONIC, &cpudraw_stop);
-        cpudraw_time += (cpudraw_stop.tv_sec - cpudraw_start.tv_sec);
-        cpudraw_time += (cpudraw_stop.tv_nsec - cpudraw_start.tv_nsec) / 1000000000.0;
+        cpudraw_time += set_field(P, N, F, WIDTH, HEIGHT);
+        cpudraw_time += draw_field(F, cpu_pix1, WIDTH, HEIGHT);
 
         // -- SDL DRAW -- //
         struct timespec sdldraw_start;
         clock_gettime(CLOCK_MONOTONIC, &sdldraw_start);
 
             SDL_UpdateTexture(gpu_tex1, NULL, cpu_pix1, WIDTH * sizeof(Uint32));
-            SDL_UpdateTexture(gpu_tex2, NULL, cpu_pix2, WIDTH * sizeof(Uint32));
             SDL_RenderClear(renderer);
-            SDL_RenderCopy(renderer, gpu_tex1, NULL, &dstrect1);
-            SDL_RenderCopy(renderer, gpu_tex2, NULL, &dstrect2);
+            SDL_RenderCopy(renderer, gpu_tex1, NULL, NULL);
             SDL_RenderPresent(renderer);
 
         struct timespec sdldraw_stop;
@@ -244,9 +288,7 @@ int main(int argc, char** argv)
 
     destroy_particles(P);
     free(F);
-    free(cpu_pix2);
     free(cpu_pix1);
-    SDL_DestroyTexture(gpu_tex2);
     SDL_DestroyTexture(gpu_tex1);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);

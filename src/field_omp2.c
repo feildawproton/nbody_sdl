@@ -10,7 +10,7 @@
 const unsigned WIDTH    = 512;
 const unsigned HEIGHT   = 512;
 
-const unsigned N        = 1000;
+const unsigned N        = 10;
 const unsigned ITER     = 10000;
 
 struct Particle{
@@ -23,7 +23,7 @@ typedef struct Particle Particle;
 
 Particle *create_particles()
 {
-    //init RNG
+    //init RNmake G
     time_t t;
     srand((unsigned) time(&t));
 
@@ -218,6 +218,31 @@ double draw_surface(const float *field, Uint32 *pixels, const unsigned LENGTH)
     return wall_time;
 }
 
+void print_particles(const Particle *P, const unsigned N, const float *field, const unsigned WIDTH, const unsigned HEIGHT)
+{
+    for (unsigned i = 0; i < N; i++)
+    {
+        unsigned x = (unsigned)(P[i].x * WIDTH);
+        unsigned y = (unsigned)(P[i].y * HEIGHT);
+        if (x >= 0 && x < WIDTH)
+        {
+            if (y >= 0 && y < HEIGHT)
+            {
+                float val = field[y * WIDTH + x];
+                printf("particle %i has field value: %f\n", i, val);
+
+                float up = sample_zeropad(field, x    , y - 1, WIDTH, HEIGHT);
+                float l  = sample_zeropad(field, x - 1, y    , WIDTH, HEIGHT);
+                float r  = sample_zeropad(field, x + 1, y    , WIDTH, HEIGHT);
+                float dn = sample_zeropad(field, x    , y + 1, WIDTH, HEIGHT);
+
+                printf("Left: %f, right: %f, up: %f, down: %f\n", l, r, up, dn);
+            }
+        }
+    }
+    
+}
+
 int main(int argc, char** argv)
 {
     // -- TEST OMP -- //
@@ -268,6 +293,9 @@ int main(int argc, char** argv)
 
         fieldcopy_time  += copy_field(field2, field1, WIDTH * HEIGHT);
     }
+
+    print_particles(particles, N, field1, WIDTH, HEIGHT);
+
     printf("Time spent setting field: %f for %i iterations\n", update_time, ITER);
     printf("Time spent on updating the field: %f\n", update_time);
     printf("Time spent on cpu draw: %f\n", cpudraw_time);
