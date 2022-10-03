@@ -360,7 +360,7 @@ int main(int argc, char** argv)
     }
 
     omp_set_dynamic(0);
-    omp_set_num_threads(n_threads / 2);
+    omp_set_num_threads((n_threads * 7)/ 8);
 
     #pragma omp parallel private(tid) shared(n_threads)
     {
