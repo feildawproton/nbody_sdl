@@ -8,16 +8,16 @@
 
 #include <omp.h>
 
-const unsigned WIDTH = 500;
-const unsigned HEIGHT = 500;
+const unsigned WIDTH    = 500;
+const unsigned HEIGHT   = 500;
 
-const unsigned N_red = 3;
-const unsigned N_green = 3;
-const unsigned N_blue = 3;
+const unsigned N_red    = 200;
+const unsigned N_green  = 100;
+const unsigned N_blue   = 200;
 
-const float dt  = 0.0001f;
+const float dt          = 0.0001f;
 
-const unsigned iter = 10000;
+const unsigned iter     = 10000;
 
 /*
 const SDL_Rect dstrect1 = {0, 0, WIDTH * 2, HEIGHT * 2};
@@ -27,6 +27,12 @@ const SDL_Rect dstrect2 = {WIDTH * 2, 0, WIDTH * 2, HEIGHT * 2};
 enum Type{red, green, blue};
 typedef enum Type Type;
 
+struct Colorf{
+    float r;
+    float g;
+    float b;
+};
+typedef struct Colorf Colorf;
 
 struct Particle{
     float   x;
@@ -89,6 +95,121 @@ void destroy_particles(Particle *P)
     free(P);
 }
 
+float rockpaperscissors(Type iType, Type jType)
+{
+    //itype
+    if (iType == red)
+    {
+        if (jType == red)
+        {
+            // red on red
+            return 0.0f;
+        }
+        else if (jType == green)
+        {
+            // red chases green
+            return 1.0f;
+        }
+        else if (jType == blue)
+        {
+            //red runs aways from blue
+            return -1.0f;
+        }        
+    }
+    else if (iType == green)
+    {
+        if (jType == red)
+        {
+            // green runs away from red
+            return -1.0f;
+        }
+        else if (jType == green)
+        {
+            // greeen on green
+            return 0.0f;
+        }
+        else if (jType == blue)
+        {
+            // green chases blue
+            return 1.0f;
+        }   
+    }
+    else if (iType == blue)
+    {
+        if (jType == red)
+        {
+            //blue chases red
+            return 1.0f;
+        }
+        else if (jType == green)
+        {
+            // blue runs away from green
+            return -1.0f;
+        }
+        else if (jType == blue)
+        {
+            //blue on blue
+            return 0.0f;
+        }   
+    }
+    else
+        return 0.0f;   
+    
+}
+
+float cycle(Type iType, Type jType)
+{
+    //itype
+    if (iType == red)
+    {
+        if (jType == red)
+        {
+            return -1.0f;
+        }
+        else if (jType == green)
+        {
+            return 1.0f;
+        }
+        else if (jType == blue)
+        {
+            return 1.0f;
+        }        
+    }
+    else if (iType == green)
+    {
+        if (jType == red)
+        {
+            return 0.0f;
+        }
+        else if (jType == green)
+        {
+            return 1.0f;
+        }
+        else if (jType == blue)
+        {
+            return 0.0f;
+        }   
+    }
+    else if (iType == blue)
+    {
+        if (jType == red)
+        {
+            return 1.0f;
+        }
+        else if (jType == green)
+        {
+            return 1.0f;
+        }
+        else if (jType == blue)
+        {
+            return -1.0f;
+        }   
+    }
+    else
+        return 0.0f;   
+    
+}
+
 double attract_vel(Particle *P, const float dt, const unsigned N)
 {
     struct timespec wall_start;              
@@ -118,6 +239,9 @@ double attract_vel(Particle *P, const float dt, const unsigned N)
             */
            //need to check if we are evaluating ourselvses
            //or if the particles are on top of eachother (unlickely but possible i suppose)
+
+            
+
             if (sqrdDist == 0.0f)
             {
                 x_force += 0.0f;
@@ -125,9 +249,13 @@ double attract_vel(Particle *P, const float dt, const unsigned N)
             }
             else
             {
-                x_force += x_dist / sqrdDist;
-                y_force += y_dist / sqrdDist;
-            }           
+                Type iType = P[i].PType;
+                Type jType = P[j].PType;
+                float rps = cycle(iType, jType);
+                x_force += rps * x_dist / sqrdDist;
+                y_force += rps * y_dist / sqrdDist;
+            }      
+            //printf("we have types %i and %i with rps: %f\n", iType, jType, rps);    
         }
         P[i].dx += x_force * dt;
         P[i].dy += y_force * dt;
@@ -162,12 +290,12 @@ double integrate(Particle *P, const float dt, const unsigned N)
 }
 
 //set field doesn't check bounds
-double set_field(const Particle *P, const unsigned N, float *F, const unsigned WIDTH, const unsigned HEIGHT)
+double set_field(const Particle *P, const unsigned N, Colorf *F, const unsigned WIDTH, const unsigned HEIGHT)
 {
     struct timespec wall_start;              
     clock_gettime(CLOCK_MONOTONIC, &wall_start);     //CLOCK_MONOTONIC requires POSIX
 
-    memset(F, 0.0, WIDTH * HEIGHT * sizeof(float));
+    memset(F, 0.0, WIDTH * HEIGHT * sizeof(Colorf));
 
     // -- LOOK OUT FOR RACE CONDITION -- //
     for (unsigned i = 0; i < N; i++)
@@ -178,9 +306,13 @@ double set_field(const Particle *P, const unsigned N, float *F, const unsigned W
         {
             if (y >= 0 && y < HEIGHT)
             {
-                F[y * WIDTH + x] += 1.0;
+                if (P[i].PType == red)
+                    F[y * WIDTH + x].r += 1.0;   
+                else if (P[i].PType == green)
+                    F[y * WIDTH + x].g += 1.0;
+                else
+                    F[y * WIDTH + x].b += 1.0;
             }
-            
         }       
     }
 
@@ -191,7 +323,7 @@ double set_field(const Particle *P, const unsigned N, float *F, const unsigned W
     return wall_time;
 }
 
-double draw_field(const float *F, Uint32 *cpu_pix1, const unsigned WIDTH, const unsigned HEIGHT)
+double draw_field(const Colorf *F, Uint32 *cpu_pix1, const unsigned WIDTH, const unsigned HEIGHT)
 {
     struct timespec wall_start;              
     clock_gettime(CLOCK_MONOTONIC, &wall_start);     //CLOCK_MONOTONIC requires POSIX
@@ -199,8 +331,10 @@ double draw_field(const float *F, Uint32 *cpu_pix1, const unsigned WIDTH, const 
     #pragma omp parallel for
     for (unsigned i = 0; i < WIDTH * HEIGHT; i++)
     {
-        float fval = F[i];
-        cpu_pix1[i] = (Uint32) (fval * 256 * 255); //need to do bet
+        Uint32 redpart      = (Uint32) (F[i].r * 255);
+        Uint32 greenpart    = (Uint32) (F[i].g * 256 * 255); 
+        Uint32 bluepart     = (Uint32) (F[i].b * 256 * 256 * 255);
+        cpu_pix1[i]         = redpart + greenpart + bluepart;
     }
 
     struct timespec wall_stop;
@@ -243,13 +377,13 @@ int main(int argc, char** argv)
 
     SDL_Window *window          = SDL_CreateWindow("base nbody", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WIDTH * 2, HEIGHT * 2, 0);   //the window
     SDL_Renderer *renderer      = SDL_CreateRenderer(window, -1, 0);    //pick the driver, -1 means init the first one supported with the flags 0
-    SDL_Texture *gpu_tex1       = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, WIDTH, HEIGHT);
+    SDL_Texture *gpu_tex1       = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, WIDTH, HEIGHT);
     Uint32 *cpu_pix1            = (Uint32 *)malloc(WIDTH * HEIGHT * sizeof(Uint32));
     memset(cpu_pix1, 0, WIDTH * HEIGHT * sizeof(Uint32)); //make it black
 
     // --SET UP SIM -- //
-    float *F                    = (float *)malloc(WIDTH * HEIGHT * sizeof(float));
-    memset(F, 0.0, WIDTH * HEIGHT * sizeof(float));
+    Colorf *F                   = (Colorf *)malloc(WIDTH * HEIGHT * sizeof(Colorf));
+    memset(F, 0.0, WIDTH * HEIGHT * sizeof(Colorf));
 
     Particle *P                 = create_particles(N_red, N_green, N_blue);
 
