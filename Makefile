@@ -28,4 +28,3 @@ multiparticle: src/multiparticle.c
 	gcc src/multiparticle.c -lSDL2 -lSDL2main -fopenmp -lm -O2 -o bin/multiparticle
 	./bin/multiparticle
 
-

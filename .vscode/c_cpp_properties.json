@@ -4,13 +4,13 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/**",
-                "/usr/lib/gcc/x86_64-pc-linux-gnu/12.2.0/include/"  //where sdl and other stuff is
+                "/usr/include/"  //where sdl and other stuff is
             ],
             "defines": [],
-            "compilerPath": "/usr/bin/clang",                       //but I'm using gcc...
+            "compilerPath": "/usr/bin/gcc",                       //but I'm using gcc...
             "cStandard": "gnu17",                                   //to supress the CLOCK_MONOTONIC undefined errors
             "cppStandard": "c++17",
-            "intelliSenseMode": "linux-clang-x64",
+            "intelliSenseMode": "linux-gcc-x64",
             "configurationProvider": "ms-vscode.makefile-tools"
         }
     ],
