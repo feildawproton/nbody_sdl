@@ -9,7 +9,7 @@
             "defines": [],
             "compilerPath": "/usr/bin/gcc",                       //but I'm using gcc...
             "cStandard": "gnu17",                                   //to supress the CLOCK_MONOTONIC undefined errors
-            "cppStandard": "c++17",
+            "cppStandard": "gnu++17",
             "intelliSenseMode": "linux-gcc-x64",
             "configurationProvider": "ms-vscode.makefile-tools"
         }
